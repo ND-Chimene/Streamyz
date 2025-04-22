@@ -1,13 +1,11 @@
 parameters:
-    tmdb.api_key: '%env(TMDB_API_KEY)%'
+    tmdb.api_key: '%env(resolve:TMDB_API_KEY)%'
 
 services:
-    # Configuration par défaut pour les services
     _defaults:
         autowire: true
         autoconfigure: true
 
-    # Charge automatiquement les classes dans src/
     App\:
         resource: '../src/'
         exclude:
@@ -15,7 +13,7 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    # Configuration explicite pour TmdbApiService
     App\Service\TmdbApiService:
         arguments:
             $apiKey: '%tmdb.api_key%'
+            $params: '@parameter_bag'
