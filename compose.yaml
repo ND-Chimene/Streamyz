@@ -1,25 +1,67 @@
-
 services:
-###> doctrine/doctrine-bundle ###
-  database:
-    image: postgres:${POSTGRES_VERSION:-16}-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-app}
-      # You should definitely change the password in production
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-!ChangeMe!}
-      POSTGRES_USER: ${POSTGRES_USER:-app}
-    healthcheck:
-      test: ["CMD", "pg_isready", "-d", "${POSTGRES_DB:-app}", "-U", "${POSTGRES_USER:-app}"]
-      timeout: 5s
-      retries: 5
-      start_period: 60s
+  php:
+    build: ./docker/php
     volumes:
-      - database_data:/var/lib/postgresql/data:rw
-      # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
-      # - ./docker/db/data:/var/lib/postgresql/data:rw
-###< doctrine/doctrine-bundle ###
+      - .:/var/www:delegated
+    depends_on:
+      - database
+    networks:
+      - streamyz_network
+
+  nginx:
+    build: ./docker/nginx
+    ports:
+      - "8000:80"
+    volumes:
+      - ./public:/var/www/public:delegated
+    depends_on:
+      - php
+    networks:
+      - streamyz_network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    restart: always
+    ports:
+      - 8081:80
+    environment:
+      PMA_HOST: streamyz_db
+      PMA_PORT: 3306
+    depends_on:
+      - database
+    networks:
+      - streamyz_network
+
+  database:
+    image: mysql:latest
+    container_name: streamyz_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: streamyz_db
+      MYSQL_ROOT_USER: root
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"
+    volumes:
+      - streamyz_db:/var/lib/mysql:rw
+    networks:
+      - streamyz_network
+
+
+  tmdb_fetcher:
+    container_name: tmdb_fetcher
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    volumes:
+      - .:/var/www:delegated
+      - ./.env.local:/var/www/.env.local:ro 
+    working_dir: /var/www
+    networks:
+      - streamyz_network
+
+networks:
+  streamyz_network:
 
 volumes:
-###> doctrine/doctrine-bundle ###
-  database_data:
-###< doctrine/doctrine-bundle ###
+  streamyz_db:
