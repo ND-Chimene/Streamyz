@@ -3,65 +3,101 @@
 namespace App\Service;
 
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
 class TmdbApiService
 {
     private HttpClientInterface $client;
     private string $apiKey;
+    private string $projectDir;
 
     public function __construct(
         HttpClientInterface $client,
-        string $apiKey
+        string $apiKey,
+        ParameterBagInterface $params
     ) {
         $this->client = $client;
         $this->apiKey = $apiKey;
+        $this->projectDir = $params->get('kernel.project_dir');
+    }
+
+    private function getDataFile(string $relativePath, callable $apiCallback): array
+    {
+        $fullPath = $this->projectDir . '/' . $relativePath;
+        echo "📁 Enregistrement du fichier : $fullPath\n";
+
+        $dir = dirname($fullPath);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0775, true);
+        }
+
+        if (file_exists($fullPath)) {
+            $data = json_decode(file_get_contents($fullPath), true);
+            if ($data !== null) {
+                return $data;
+            }
+        }
+
+        $data = $apiCallback();
+        file_put_contents($fullPath, json_encode($data, JSON_PRETTY_PRINT));
+        return $data;
     }
 
     public function fetchPopularMovies(): array
     {
-        $response = $this->client->request('GET', 'https://api.themoviedb.org/3/movie/popular', [
-            'query' => [
-                'api_key' => $this->apiKey,
-                'language' => 'fr-FR'
-            ]
-        ]);
-
-        return $response->toArray();
+        return $this->getDataFile(
+            "var/tmdb/popularMovies.json",
+            fn() => $this->client->request('GET', 'https://api.themoviedb.org/3/movie/popular', [
+                'query' => [
+                    'api_key' => $this->apiKey,
+                    'language' => 'fr-FR'
+                ]
+            ])->toArray()
+        );
     }
 
-    public function fetchAllMovies(int $maxPages = 10): array
+    public function fetchAllMovies(): array
+    {
+        return $this->getDataFile(
+            'var/tmdb/allMovies.json',
+            fn() => $this->fetchAllPages('/movie/popular')
+        );
+    }
+
+    private function fetchAllPages(string $endpoint): array
     {
         $allMovies = [];
         $page = 1;
 
         do {
-            $response = $this->client->request('GET', 'https://api.themoviedb.org/3/discover/movie', [
+            $response = $this->client->request('GET', "https://api.themoviedb.org/3$endpoint", [
                 'query' => [
                     'api_key' => $this->apiKey,
                     'language' => 'fr-FR',
-                    'page' => $page
+                    'page' => $page,
                 ]
-            ]);
+            ])->toArray();
 
-            $data = $response->toArray();
-            $allMovies = array_merge($allMovies, $data['results']);
+            $allMovies = array_merge($allMovies, $response['results']);
+            $totalPages = $response['total_pages'] ?? 1;
             $page++;
-        } while ($page <= $data['total_pages'] && $page <= $maxPages);
+        } while ($page <= $totalPages);
 
         return $allMovies;
     }
 
-    public function fetchGenreMovies(string $genre): array
+    public function fetchGenreMovies(string $genreId): array
     {
-        $response = $this->client->request('GET', 'https://api.themoviedb.org/3/discover/movie', [
-            'query' => [
-                'api_key' => $this->apiKey,
-                'language' => 'fr-FR',
-                'with_genres' => $genre
-            ]
-        ]);
-
-        return $response->toArray();
+        return $this->getDataFile(
+            "var/tmdb/movies_genre_{$genreId}.json",
+            fn() => $this->client->request('GET', 'https://api.themoviedb.org/3/discover/movie', [
+                'query' => [
+                    'api_key' => $this->apiKey,
+                    'language' => 'fr-FR',
+                    'with_genres' => $genreId,
+                ]
+            ])->toArray()
+        );
     }
 
     public function fetchDetailMovie(int $id): array
@@ -78,38 +114,32 @@ class TmdbApiService
 
     public function videoMovie(int $id): array
     {
-        $response = $this->client->request('GET', "https://api.themoviedb.org/3/movie/{$id}/videos", [
+        return $this->client->request('GET', "https://api.themoviedb.org/3/movie/{$id}/videos", [
             'query' => [
                 'api_key' => $this->apiKey,
                 'language' => 'fr-FR'
             ]
-        ]);
-
-        return $response->toArray();
+        ])->toArray();
     }
 
     public function reviewMovie(int $id): array
     {
-        $response = $this->client->request('GET', "https://api.themoviedb.org/3/movie/{$id}/reviews", [
+        return $this->client->request('GET', "https://api.themoviedb.org/3/movie/{$id}/reviews", [
             'query' => [
                 'api_key' => $this->apiKey,
                 'language' => 'fr-FR'
             ]
-        ]);
-
-        return $response->toArray();
+        ])->toArray();
     }
 
     public function searchMovies(string $query): array
     {
-        $response = $this->client->request('GET', 'https://api.themoviedb.org/3/search/movie', [
+        return $this->client->request('GET', 'https://api.themoviedb.org/3/search/movie', [
             'query' => [
                 'api_key' => $this->apiKey,
                 'language' => 'fr-FR',
                 'query' => $query
             ]
-        ]);
-
-        return $response->toArray();
+        ])->toArray();
     }
 }
