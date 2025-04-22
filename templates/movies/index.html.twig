@@ -10,22 +10,21 @@
 {% block body %}
 	<body class="bg-gray-900 min-h-screen text-gray-100">
 		<div class="p-6">
-			{% if history.tmdb != [] %}
+			{% if history is not null and history.tmdb is not empty %}
 				<h2 class="text-3xl font-bold m-5 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">Historique</h2>
 				<div class='flex flex-row flex-wrap justify-center gap-6 p-6'>
-
-			{% for histori in history.tmdb %}
-				{% set title = history.title[loop.index0] %}
-				<a href="{{ path('movie_detail', {id: histori}) }}">
-					<div class="movie bg-gray-800 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-300 cursor-pointer">
-						<h2 class="text-lg m-3 text-center font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">{{ title }}</h2>
-					</div>
-				</a>
-			{% endfor %}
-
+					{% for histori in history.tmdb %}
+						{% set title = history.title[loop.index0] %}
+						<a href="{{ path('movie_detail', {id: histori}) }}">
+							<div class="movie bg-gray-800 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-300 cursor-pointer">
+								<h2 class="text-lg m-3 text-center font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">{{ title }}</h2>
+							</div>
+						</a>
+					{% endfor %}
 				</div>
 			{% endif %}
-			</div>
+
+		</div>
 		{% if not search %}
 			<div class="flex items-center justify-center flex-col lg:flex-row gap-8 m-5">
 				{% if not genre %}
@@ -78,14 +77,12 @@
 							</div>
 
 							<div class="absolute top-2 left-2">
-								<button onclick="toggleFavorite(event, {{ movie.id }})"
-										class="w-10 h-10 rounded-full bg-gray-900 border-gray-700 flex items-center justify-center hover:bg-gray-800 transition-colors cursor-pointer"
-										data-movie-id="{{ movie.id }}">
+								<button onclick="toggleFavorite(event, {{ movie.id }})" class="w-10 h-10 rounded-full bg-gray-900 border-gray-700 flex items-center justify-center hover:bg-gray-800 transition-colors cursor-pointer" data-movie-id="{{ movie.id }}">
 									<span class="favorite-icon text-purple-400" id="favorite-{{ movie.id }}">
 										{{ ux_icon('ph:heart-fill', {height: '20px', width: '20px'}) }}
 									</span>
 								</button>
-    						</div>
+							</div>
 
 							<h2 class="text-sm sm:text-base md:text-lg m-2 text-center font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">{{ movie.title|slice(0,16) }}</h2>
 							<p class="text-sm sm:text-base md:text-lg m-2 text-center font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">({{movie.release_date|slice(0,4)}})</p>
@@ -97,4 +94,3 @@
 		{{ knp_pagination_render(movies, 'bundles/KnpPaginatorBundle/Pagination/custom_pagination.html.twig') }}
 	</body>
 {% endblock %}
-
