@@ -26,43 +26,9 @@ class MovieController extends AbstractController
     private function getMovies(Request $request, PaginatorInterface $paginator): array
     {
         $search = $request->query->get('search');
-        $genre = $request->query->get('genre');
+        $genreId = $request->query->get('genre');
         $page = $request->query->getInt('page', 1);
 
-        try {
-            if ($search) {
-                $movies = $this->tmdbApiService->searchMovies($search);
-            } elseif ($genre) {
-                $movies = $this->tmdbApiService->fetchGenreMovies($genre);
-            } else {
-                $movies = $this->tmdbApiService->fetchPopularMovies();
-            }
-
-            $results = $movies['results'] ?? [];
-            $user = $this->historyService->getUser();
-            $history = $this->historyRepository->findOneBy(['user' => $user]);
-
-            return [
-                'movies' => $paginator->paginate($results, $page, 14),
-                'search' => $search,
-                'genre' => $genre,
-                'history' => $history,
-                'error' => null
-            ];
-        } catch (\Exception $e) {
-            return [
-                'movies' => [],
-                'search' => $search,
-                'genre' => $genre,
-                'history' => [],
-                'error' => 'Une erreur est survenue lors de la récupération des films.'
-            ];
-        }
-    }
-
-    #[Route('/', name: 'movie_list')]
-    public function index(Request $request, PaginatorInterface $paginator): Response
-    {
         $genres = [
             "28" => "Action",
             "12" => "Aventure",
@@ -80,30 +46,65 @@ class MovieController extends AbstractController
             "53" => "Thriller",
         ];
 
-        $genreId = $request->query->get('genre');
         $selectedGenre = $genres[$genreId] ?? null;
 
-        $moviesData = $this->getMovies($request, $paginator);
+        try {
+            if ($search) {
+                $movies = $this->tmdbApiService->searchMovies($search);
+            } elseif ($genreId) {
+                $movies = $this->tmdbApiService->fetchGenreMovies($genreId);
+            } else {
+                $movies = $this->tmdbApiService->fetchPopularMovies();
+            }
 
-        $moviesData['selectedGenre'] = $selectedGenre;
-        $moviesData['genres'] = $genres;
+            $results = $movies['results'] ?? $movies['data'] ?? [];
 
-        $response = $this->render('movies/index.html.twig', $moviesData);
-
-        // Gestion du cookie utilisateur
-        if (!$request->cookies->has('user_uuid')) {
             $user = $this->historyService->getUser();
-            $cookie = Cookie::create('user_uuid', $user)
-                ->withExpires(new \DateTime('+1 year'))
-                ->withPath('/')
-                ->withSecure($request->isSecure())
-                ->withHttpOnly(true);
-            $response->headers->setCookie($cookie);
-        }
+            $history = $this->historyRepository->findOneBy(['user' => $user]);
 
-        return $response;
+            return [
+                'movies' => $paginator->paginate($results, $page, 14),
+                'search' => $search,
+                'genre' => $genreId,
+                'selectedGenre' => $selectedGenre,
+                'genres' => $genres,
+                'history' => $history,
+                'error' => null
+            ];
+        } catch (\Exception $e) {
+            return [
+                'movies' => [],
+                'search' => $search,
+                'genre' => $genreId,
+                'selectedGenre' => $selectedGenre,
+                'genres' => $genres,
+                'history' => [],
+                'error' => 'Une erreur est survenue lors de la récupération des films.'
+            ];
+        }
     }
 
+    // Done
+    #[Route('/', name: 'movie_list')]
+    public function index(Request $request, PaginatorInterface $paginator): Response
+    {
+
+        $data = $this->getMovies($request, $paginator);
+        $response = $this->render('movies/index.html.twig', $data);
+
+        $user = $this->historyService->getUser();
+        $cookie = Cookie::create('user_uuid', $user)
+            ->withExpires(new \DateTime('+1 year'))
+            ->withPath('/')
+            ->withSecure($request->isSecure())
+            ->withHttpOnly(true);
+        $response->headers->setCookie($cookie);
+
+        return $response;
+
+    }
+
+    // Done
     #[Route('/movies/all', name: 'movie_all')]
     public function tous(Request $request, PaginatorInterface $paginator): Response
     {
